@@ -1,11 +1,14 @@
 package F4.AiLock.entity;
 
+import F4.AiLock.dto.PostEvaluateResponseDto;
+import F4.AiLock.dto.SessionContext;
 import F4.AiLock.enums.SessionType;
 import F4.AiLock.enums.Status;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnTransformer;
 
 
 import java.time.LocalDateTime;
@@ -58,11 +61,47 @@ public class History {
     @Column(name = "overuse_time", nullable = false)
     private Integer overuseTime;
 
+    @Column(name = "use_minute",nullable = false)
+    private Integer totalUseMinute;
+
+    @Column(name = "opened_at", nullable = false)
+    private LocalDateTime openedAt;
+
     @Column(name = "promise_kept", nullable = false)
     private boolean promiseKept = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "embedding", nullable = false, columnDefinition = "vector(1024")
+    @Convert(converter = FloatArrayToVectorConverter.class)
+    @ColumnTransformer(write = "?::vector")
+    float[] embedding;
+
+    public History(
+            SessionContext context,
+            String postInput,
+            PostEvaluateResponseDto responseDto,
+            Integer overuseTime,
+            boolean promiseKept
+    ) {
+        this.deviceId = context.deviceId();
+        this.appName = context.appName();
+        this.preInput = context.preInput();
+        this.postInput = postInput;
+        this.usageLevel = context.usageLevel();
+        this.willPowerLevel = context.willPowerLevel();
+        this.status = responseDto.status();
+        this.sessionType = SessionType.valueOf(context.sessionType());
+        this.targetMinute = context.targetMinute();
+        this.requestMinute = context.requestMinute();
+        this.allowTime = responseDto.allowTime();
+        this.totalUseMinute = context.todayUse();
+        this.overuseTime = overuseTime;
+        this.promiseKept = promiseKept;
+        this.openedAt = LocalDateTime.now();
+        this.embedding = context.embedding();
+    }
 
     @PrePersist
     protected void onCreate() {
