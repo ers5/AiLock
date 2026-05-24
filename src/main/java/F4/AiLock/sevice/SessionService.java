@@ -3,10 +3,8 @@ package F4.AiLock.sevice;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
 @Service
 @RequiredArgsConstructor
-public class PreEvaluate {
-    private final HistoryService historyService;
+public class SessionService {
 
 }
