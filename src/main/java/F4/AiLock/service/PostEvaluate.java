@@ -1,0 +1,177 @@
+package F4.AiLock.service;
+
+import F4.AiLock.dto.PostEvaluateRequestDto;
+import F4.AiLock.dto.PostEvaluateResponseDto;
+import F4.AiLock.dto.SessionContext;
+import F4.AiLock.enums.Status;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class PostEvaluate {
+
+    private final SessionService sessionService;
+    private final ChatModel chatModel;
+    private final ObjectMapper objectMapper;
+    private final HistoryService historyService;
+
+    public PostEvaluateResponseDto postEvaluate(PostEvaluateRequestDto dto) {
+        SessionContext context = sessionService.getSession(dto.sessionId());
+
+        log.info("과거 기록: {}",context.historySummary());
+
+        Integer extractedMinute = extractMinutes(dto.postInput());
+        String requestedMinute = extractedMinute == null ? "없음" : extractedMinute + "분";
+        String prompt = String.format("""
+{
+  "current_state": {
+    "app_name": "%s",
+    "initial_status": "%s",
+    "pre_input": "%s",
+    "post_input": "%s",
+    "requested_minute": "%s",
+    "usage_level": "%s",
+    "willpower_level": "%s"
+  },
+  "rag_context": {
+    "history_summary": "%s"
+  },
+  "instruction": "사용자가 앱을 자제하려는 이유(pre_input)와 지금 다시 열려는 이유(post_input)를 평가하여, 초기 상태(initial_status)를 조정하고 허용 시간과 메시지를 결정해라.
+
+1. 상태 조정 규칙 (단계 방향: CRITICAL ← OVERUSE ← WARNING ← OPTIMAL)
+      사용자 입력(post_input)의 사유를 평가하여 상태를 다음과 같이 이동해라.
+
+      - [타당한 사유] 학업, 업무, 긴급 상황, 중요한 연락 확인 등 정당한 목적이 구체적인 경우
+        -> 오른쪽(OPTIMAL 방향)으로 1단계 이동 (예: OVERUSE -> WARNING)
+        -> 이미 'OPTIMAL' 상태라면 'OPTIMAL'을 그대로 유지
+
+      - [단순 충동] "그냥", "심심해서", "잠깐만", "조금만", "보고 싶어서" 등 단순 사용 욕구인 경우
+        -> 왼쪽(CRITICAL 방향)으로 1단계 이동 (예: WARNING -> OVERUSE)
+        -> 이미 'CRITICAL' 상태라면 더 내려갈 곳이 없으므로 반드시 'CRITICAL'을 그대로 유지 (절대로 OVERUSE로 올리지 마라)
+
+      - [무의미/비협조적 입력] 사유가 없거나, 욕설/초성/반발/무성의한 답변 등 대화를 거부하는 경우
+        -> 현재 상태와 관계없이 무조건 최종 상태를 'CRITICAL'로 강제 고정
+
+   2. 요청 시간(requested_minute) 반영 규칙:
+      - requested_minute는 사용자가 직접 요청한 사용 시간이다.
+      - requested_minute가 "없음"이면 요청 시간을 고려하지 말고 최종 상태 기준 허용 시간 규칙만 따라라.
+      - requested_minute가 있더라도 최종 상태별 허용 시간 범위를 절대 벗어나지 마라.
+      - requested_minute가 최종 상태 기준 허용 범위보다 크면, 상태 기준 범위 안에서 더 짧게 조정해라.
+      - requested_minute가 최종 상태 기준 허용 범위 안에 있고 post_input이 타당하면, requested_minute를 최대한 반영해라.
+
+   3. RAG 반영 규칙:
+      - rag_context.history_summary는 과거 유사 상황의 참고 기록이다.
+      - 과거에 같은 앱에서 약속을 자주 어기거나, 허용 시간 이후 초과 사용한 기록이 있으면 왼쪽(CRITICAL 방향) 판단을 강화해라.
+      - 과거에 약속을 잘 지킨 기록이 많으면 오른쪽(OPTIMAL 방향) 판단을 약하게 허용해라.
+      - rag_context가 비어 있으면 무시하고 current_state만 기준으로 판단해라.
+
+   4. 최종 조정된 상태 기준 허용 시간(allowedTime) 결정 규칙:
+      - 최종 상태가 'OPTIMAL'이면: 30 이상 60 이하의 정수 중 선택
+      - 최종 상태가 'WARNING'이면: 10 이상 30 이하의 정수 중 선택
+      - 최종 상태가 'OVERUSE'이면: 5 이상 10 이하의 정수 중 선택
+      - 최종 상태가 'CRITICAL'이면: 무조건 0으로 설정
+
+   5. 메시지(supportMessage) 작성 규칙:
+      - 말투는 반드시 '따뜻한 반말'로 작성해라.
+      - 메시지에 이모티콘은 절대 넣지 마라.
+      - 1~2줄로 짧게 작성해라.
+      - 상태가 위험하면 부드럽지만 단호하게 제한해라.
+      - rag_context.history_summary가 "없음"이 아니면, supportMessage에는 반드시 과거 패턴을 짧게 암시하는 표현을 포함해라.
+      - 단, 과거 기록을 직접 길게 설명하지 말고 짧게 암시해라.
+
+      6. 메시지 예시:
+      - rag_context에 과거 초과 사용 패턴이 있으면 아래처럼 짧게 반영해라.
+      예시 입력:
+      post_input: "강의 자료 확인하려고 3분만 볼게"
+      history_summary: "짧게 확인하려다 15분에서 30분까지 초과 사용한 패턴이 반복됨"
+      예시 출력:
+      {
+       "status": "WARNING",
+        "allowedTime": 10,
+       supportMessage": "강의 자료만 짧게 확인하고 바로 돌아오자. 예전처럼 과사용 하지 않게 이번엔 딱 필요한 것만 보자."
+      }
+
+   7. 출력 형식:
+      - 결과는 아래 key를 포함한 오직 JSON 형식으로만 반환해라. status 값은 니가 최종 조정한 상태값으로 채워라.
+      {
+        "status": "최종 조정된 상태(OPTIMAL, WARNING, OVERUSE, CRITICAL 중 택1)",
+        "allowedTime": (분 단위 정수),
+        "supportMessage": "(생성된 메시지)"
+      }"
+}
+""",
+                context.appName(),
+                context.status().name(),
+                context.preInput(),
+                dto.postInput(),
+                requestedMinute,
+                context.usageLevel(),
+                context.willPowerLevel(),
+                context.historySummary()
+        );
+        String preResult=null;
+
+
+        try {
+            preResult = chatModel.call(prompt);
+            log.info("PostEvaluate LLM 반환: {}", preResult);
+
+            String json = extractJson(preResult);
+            PostEvaluateResponseDto result = objectMapper.readValue(json, PostEvaluateResponseDto.class);
+
+            historyService.saveHistory(context,dto,result);
+            log.info("히스토리 저장 완료: {}",context.historySummary());
+            return new PostEvaluateResponseDto(result.supportMessage(),result.allowedTime(),result.status());
+        } catch (Exception e) {
+            log.warn("postEvalute 파싱 실패 반환 값: {}",preResult,e);
+
+            return  new PostEvaluateResponseDto(
+                    "판단 중 문제가 생겼어. 잠시 후 다시 시도해줘",0,Status.FAIL
+            );
+        }
+
+    }
+
+    private String extractJson(String result) {
+        int start = result.indexOf("{");
+        int end = result.lastIndexOf("}");
+
+        if (start == -1 || end == -1 || start > end) {
+            throw new IllegalArgumentException("JSON 객체가 없습니다: " + result);
+        }
+
+        return result.substring(start, end + 1);
+    }
+
+    private Integer extractMinutes(String input) {
+        if(input==null || input.isBlank()) return null;
+
+        Pattern pattern = Pattern.compile("(\\d+)\\s*(시간|분|초)");
+        Matcher matcher = pattern.matcher(input);
+
+        int totalMinute=0;
+        boolean found=false;
+
+        while (matcher.find()) {
+            int value = Integer.parseInt(matcher.group(1));
+            String unit = matcher.group(2);
+
+            switch (unit) {
+                case "시간" -> totalMinute += value * 60;
+                case "분" -> totalMinute += value;
+                case "초" -> totalMinute += (int)Math.ceil(value / 60.0);
+            }
+            found=true;
+        }
+        if (!found) return null;
+        return totalMinute;
+    }
+}

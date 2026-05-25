@@ -4,7 +4,7 @@ import F4.AiLock.enums.Status;
 
 public record PostEvaluateResponseDto(
         String supportMessage,
-        Integer allowTime,
+        Integer allowedTime,
         Status status
 ) {
 }

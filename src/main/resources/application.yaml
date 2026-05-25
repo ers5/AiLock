@@ -2,9 +2,13 @@ spring:
   application:
     name: AiLock
 
+  docker:
+    compose:
+      enabled: false
+
   ai:
     ollama:
-      base-url: http://168.188.128.36:20251
+      base-url: http://localhost:20251
 
       chat:
         model: gemma3:12b

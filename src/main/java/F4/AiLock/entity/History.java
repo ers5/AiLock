@@ -1,6 +1,7 @@
 package F4.AiLock.entity;
 
 import F4.AiLock.dto.PostEvaluateResponseDto;
+import F4.AiLock.dto.PostEvaluateResultDto;
 import F4.AiLock.dto.SessionContext;
 import F4.AiLock.enums.SessionType;
 import F4.AiLock.enums.Status;
@@ -49,11 +50,11 @@ public class History {
     @Column(name = "session_type", nullable = false)
     private SessionType sessionType;
 
-    @Column(name = "target_minute")
-    private Integer targetMinute;
+    @Column(name = "planned_use_minute")
+    private Integer plannedUseMinute;
 
-    @Column(name = "request_minute")
-    private Integer requestMinute;
+    @Column(name = "total_use")
+    private Integer totalUse;
 
     @Column(name = "allow_time", nullable = false)
     private Integer allowTime;
@@ -61,19 +62,13 @@ public class History {
     @Column(name = "overuse_time", nullable = false)
     private Integer overuseTime;
 
-    @Column(name = "use_minute",nullable = false)
-    private Integer totalUseMinute;
-
-    @Column(name = "opened_at", nullable = false)
-    private LocalDateTime openedAt;
-
     @Column(name = "promise_kept", nullable = false)
     private boolean promiseKept = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "embedding", nullable = false, columnDefinition = "vector(1024")
+    @Column(name = "embedding", nullable = false, columnDefinition = "vector(1024)")
     @Convert(converter = FloatArrayToVectorConverter.class)
     @ColumnTransformer(write = "?::vector")
     float[] embedding;
@@ -83,7 +78,9 @@ public class History {
             String postInput,
             PostEvaluateResponseDto responseDto,
             Integer overuseTime,
-            boolean promiseKept
+            Integer totalUse,
+            boolean promiseKept,
+            float[] embedding
     ) {
         this.deviceId = context.deviceId();
         this.appName = context.appName();
@@ -91,16 +88,14 @@ public class History {
         this.postInput = postInput;
         this.usageLevel = context.usageLevel();
         this.willPowerLevel = context.willPowerLevel();
-        this.status = responseDto.status();
+        this.status = context.status();
         this.sessionType = SessionType.valueOf(context.sessionType());
-        this.targetMinute = context.targetMinute();
-        this.requestMinute = context.requestMinute();
-        this.allowTime = responseDto.allowTime();
-        this.totalUseMinute = context.todayUse();
+        this.plannedUseMinute = context.plannedUseMinute();
+        this.allowTime = responseDto.allowedTime();
         this.overuseTime = overuseTime;
         this.promiseKept = promiseKept;
-        this.openedAt = LocalDateTime.now();
-        this.embedding = context.embedding();
+        this.totalUse=totalUse;
+        this.embedding = embedding;
     }
 
     @PrePersist

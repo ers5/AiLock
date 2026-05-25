@@ -1,9 +1,6 @@
-package F4.AiLock.sevice;
+package F4.AiLock.service;
 
-import F4.AiLock.dto.PostEvaluateRequestDto;
-import F4.AiLock.dto.PostEvaluateResponseDto;
-import F4.AiLock.dto.PreEvaluateRequestDto;
-import F4.AiLock.dto.SessionContext;
+import F4.AiLock.dto.*;
 import F4.AiLock.entity.History;
 import F4.AiLock.repository.HistoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +60,9 @@ public class HistoryService {
     }
 
     public void saveHistory(SessionContext context, PostEvaluateRequestDto requestDto, PostEvaluateResponseDto responseDto) {
-        History history = new History(context, requestDto.postInput(), responseDto, 0, false);
+        float[] embed = embeddingModel.embed(requestDto.postInput());
+        History history = new History(
+                context, requestDto.postInput(), responseDto, 0,0, false,embed);
         historyRepository.save(history);
     }
 

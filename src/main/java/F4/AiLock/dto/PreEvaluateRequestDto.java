@@ -5,6 +5,8 @@ public record PreEvaluateRequestDto(
         String appName,
         String preInput,
         Integer willPowerScore,
-        Integer todayUse
+        Integer todayUse,
+        Integer requestUseTime,
+        String sessionType
 ) {
 }
