@@ -104,6 +104,7 @@ public class PreEvaluate {
                         willpowerLevel,
                         dto.sessionType(),
                         dto.requestUseTime()
+                        ,null
                 );
                 Duration ttl=Duration.ofMinutes(dto.requestUseTime()+5);
                 String sessionId = sessionService.createSession(sessionContext, ttl);
@@ -123,6 +124,7 @@ public class PreEvaluate {
                 willpowerLevel,
                 dto.sessionType(),
                 dto.requestUseTime()
+                ,null
         );
         Duration ttl=Duration.ofMinutes(dto.requestUseTime()+5);
         String sessionId = sessionService.createSession(failContext, ttl);

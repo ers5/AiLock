@@ -11,6 +11,21 @@ public record SessionContext(
         String usageLevel,
         String willPowerLevel,
         String sessionType,
-        Integer plannedUseMinute
+        Integer plannedUseMinute,
+        Long dbId
 ) {
+    public SessionContext withDbId(Long dbId) {
+        return new SessionContext(
+                deviceId,
+                appName,
+                preInput,
+                status,
+                historySummary,
+                usageLevel,
+                willPowerLevel,
+                sessionType,
+                plannedUseMinute,
+                dbId
+        );
+    }
 }

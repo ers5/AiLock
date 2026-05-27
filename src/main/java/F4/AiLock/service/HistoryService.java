@@ -3,19 +3,23 @@ package F4.AiLock.service;
 import F4.AiLock.dto.*;
 import F4.AiLock.entity.History;
 import F4.AiLock.repository.HistoryRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.ollama.OllamaEmbeddingModel;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class HistoryService {
 
     private final HistoryRepository historyRepository;
     private final OllamaEmbeddingModel embeddingModel;
     private final UserContextConvertService userContextConvertService;
+    private final SessionService sessionService;
 
     /**
      * 과거 기록 가져오는 가중치인데 현재 가중치가
@@ -59,11 +63,20 @@ public class HistoryService {
                 .toList();
     }
 
-    public void saveHistory(SessionContext context, PostEvaluateRequestDto requestDto, PostEvaluateResponseDto responseDto) {
+    public Long saveHistory(SessionContext context, PostEvaluateRequestDto requestDto, PostEvaluateResponseDto responseDto) {
         float[] embed = embeddingModel.embed(requestDto.postInput());
         History history = new History(
                 context, requestDto.postInput(), responseDto, 0,0, false,embed);
-        historyRepository.save(history);
+        History saved = historyRepository.save(history);
+        return saved.getId();
+    }
+    @Transactional
+    public void updateHistory(String sessionId,Integer totalUseTime) {
+        SessionContext session = sessionService.getSession(sessionId);
+        History history=historyRepository.findById(session.dbId())
+                .orElseThrow(()->new IllegalArgumentException("히스토리가 없습니다"));
+        history.updatePromise(totalUseTime);
+        log.info("히스토리 업데이트 약속시간: {}, 총 사용 시간: {}",history.getPlannedUseMinute(),history.getTotalUse());
     }
 
     private double calculateCosineSimilarity(float[] v1,float[] v2) {

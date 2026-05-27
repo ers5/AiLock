@@ -26,8 +26,12 @@ public class SessionService {
         return context;
     }
 
-    public void updateTtl(String sessionId, Duration ttl) {
-        redisTemplate.expire(sessionId, ttl);
+    public void update(String sessionId, Long id, Duration ttl) {
+        SessionContext context = getSession(sessionId);
+
+        SessionContext updated = context.withDbId(id);
+
+        redisTemplate.opsForValue().set(sessionId, updated, ttl);
     }
 
     public void deleteSession(String sessionId) {

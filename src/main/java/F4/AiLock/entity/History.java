@@ -98,6 +98,12 @@ public class History {
         this.embedding = embedding;
     }
 
+    public void updatePromise(Integer totalUseTime) {
+        if (this.plannedUseMinute>=totalUseTime){
+            this.promiseKept=true;
+        }
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

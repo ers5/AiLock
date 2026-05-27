@@ -10,6 +10,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -126,8 +127,11 @@ public class PostEvaluate {
 
             String json = extractJson(preResult);
             PostEvaluateResponseDto result = objectMapper.readValue(json, PostEvaluateResponseDto.class);
+            Duration ttl = Duration.ofMinutes(result.allowedTime()+5);
 
-            historyService.saveHistory(context,dto,result);
+            Long id = historyService.saveHistory(context, dto, result);
+            sessionService.update(dto.sessionId(),id, ttl);
+
             log.info("히스토리 저장 완료: {}",context.historySummary());
             return new PostEvaluateResponseDto(result.supportMessage(),result.allowedTime(),result.status());
         } catch (Exception e) {
