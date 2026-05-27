@@ -104,6 +104,28 @@ public class History {
         }
     }
 
+    public History(SessionContext context,
+                   String postInput,
+                   Integer totalUseTime,
+                   boolean promiseKept,
+                   float[] embedding) {
+
+        this.deviceId = context.deviceId();
+        this.appName = context.appName();
+        this.preInput = context.preInput();
+        this.postInput = postInput;
+        this.status = context.status();
+        this.usageLevel = context.usageLevel();
+        this.willPowerLevel = context.willPowerLevel();
+        this.sessionType = SessionType.valueOf(context.sessionType());
+        this.plannedUseMinute = context.plannedUseMinute();
+        this.overuseTime = 0;
+        this.totalUse = totalUseTime;
+        this.promiseKept = promiseKept;
+        this.embedding = embedding;
+        this.allowTime = 0;
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -28,6 +28,6 @@ public class appController {
 
     @PostMapping("/testUpdate")
     public void testUpdate(@RequestBody PromiseFeedbackDto dto) {
-        historyService.updateHistory(dto.sessionId(),dto.totalUseTime());
+        historyService.finishOrUpdate(dto.sessionId(),dto.totalUseTime());
     }
 }

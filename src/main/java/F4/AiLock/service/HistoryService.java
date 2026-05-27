@@ -71,12 +71,31 @@ public class HistoryService {
         return saved.getId();
     }
     @Transactional
-    public void updateHistory(String sessionId,Integer totalUseTime) {
+    public void finishOrUpdate(String sessionId, Integer totalUseTime) {
         SessionContext session = sessionService.getSession(sessionId);
-        History history=historyRepository.findById(session.dbId())
-                .orElseThrow(()->new IllegalArgumentException("히스토리가 없습니다"));
-        history.updatePromise(totalUseTime);
-        log.info("히스토리 업데이트 약속시간: {}, 총 사용 시간: {}",history.getPlannedUseMinute(),history.getTotalUse());
+
+        //얘가 아직 null 이면, PostEvaluate가 호출을 안한상태인 세션, 즉 사용자가 사용하고자 했던 시간 안에 종료한 경우
+        if (session.dbId() == null) {
+            saveEarlyFinish(session, totalUseTime);
+        } else {
+            History history = historyRepository.findById(session.dbId())
+                    .orElseThrow(() -> new IllegalArgumentException("히스토리가 없습니다"));
+
+            history.updatePromise(totalUseTime);
+
+            log.info("히스토리 업데이트, 약속시간: {}, 총 사용 시간: {}",
+                    history.getPlannedUseMinute(),
+                    history.getTotalUse());
+        }
+
+        sessionService.deleteSession(sessionId);
+    }
+
+    private void saveEarlyFinish(SessionContext context, Integer totalUseTime) {
+        String postInput = "조기 종료, 사용자가 허용 시간 전에 앱 사용을 종료함";
+        float[] embed = embeddingModel.embed(postInput);
+        History history = new History(context, postInput, totalUseTime, true, embed);
+        historyRepository.save(history);
     }
 
     private double calculateCosineSimilarity(float[] v1,float[] v2) {
