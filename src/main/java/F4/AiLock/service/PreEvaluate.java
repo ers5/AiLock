@@ -77,7 +77,6 @@ public class PreEvaluate {
             반드시 JSON만 반환해.
             {
               "status": "OPTIMAL | WARNING | OVERUSE | CRITICAL",
-              "reason": "판단 이유를 1~2문장으로 작성",
               "summary": "과거 유사 기록 패턴 요약"
             }
             """,

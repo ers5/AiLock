@@ -83,9 +83,11 @@ public class HistoryService {
 
             history.updatePromise(totalUseTime);
 
-            log.info("히스토리 업데이트, 약속시간: {}, 총 사용 시간: {}",
+            log.info("히스토리 업데이트, 약속시간: {}, 총 사용 시간: {}, 약속 이행:{}",
                     history.getPlannedUseMinute(),
-                    history.getTotalUse());
+                    history.getTotalUse(),
+                    history.isPromiseKept()
+            );
         }
 
         sessionService.deleteSession(sessionId);
