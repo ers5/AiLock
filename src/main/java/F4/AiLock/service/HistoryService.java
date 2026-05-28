@@ -89,8 +89,6 @@ public class HistoryService {
                     history.isPromiseKept()
             );
         }
-
-        sessionService.deleteSession(sessionId);
     }
 
     private void saveEarlyFinish(SessionContext context, Integer totalUseTime) {
